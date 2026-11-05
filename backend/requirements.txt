@@ -1,0 +1,10 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+pypdf==4.3.1
+pillow==10.4.0
+# Optional — enable OCR for scanned docs + PDF-page ELA.
+# The Python wrappers install via pip; they also need system binaries
+# (tesseract-ocr, poppler-utils) which the Dockerfile installs.
+pytesseract==0.3.13
+pdf2image==1.17.0
