@@ -48,6 +48,7 @@ docker run -p 8000:8000 blacklight-api
 ## Deploy free
 
 - **Render / Railway:** new Web Service from the repo, root `backend/`, it detects the Dockerfile. Set the frontend’s `BLACKLIGHT_API` to the service URL.
+- **Vercel:** create a project from the repository root. The root `pyproject.toml` points Vercel to `backend.app:app` and lists the Python dependencies.
 - CORS is open (`*`) so a static frontend on any host can call it.
 
 ## API

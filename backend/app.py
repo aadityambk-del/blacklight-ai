@@ -8,7 +8,10 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-import forensics
+if __package__:
+    from . import forensics
+else:
+    import forensics
 
 app = FastAPI(title="BLACKLIGHT AI — Document Forensics API", version="1.0")
 
