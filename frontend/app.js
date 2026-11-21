@@ -364,6 +364,26 @@ function runFormatChecks(rep,add,bump){
   // vehicle registration
   const veh=(U.match(/\b[A-Z]{2}\s?\d{1,2}\s?[A-Z]{1,3}\s?\d{3,4}\b/)||[])[0];
   if(veh&&!pan){ rep.fields.vehicle=veh; rep.checks.push({ok:true,t:'Vehicle reg.',m:'IND plate format',v:'Found · '+veh}); }
+  // payment card (Luhn) — only in card context, to avoid matching VIDs / long ids
+  if(/\b(card|credit|debit|visa|master|maestro|rupay|amex|cvv|expiry)\b/i.test(t)){
+    const cm=t.match(/\b(?:\d[ -]?){13,19}\b/); const cd=cm?cm[0].replace(/\D/g,''):'';
+    if(cd.length>=13&&cd.length<=19){ const ok=luhn(cd); const mask='•••• '+cd.slice(-4);
+      rep.checks.push({ok,t:'Payment card (Luhn)',m:'card-number checksum',v:(ok?'Valid · ':'FAILS · ')+mask});
+      if(ok) add('obs','Payment card number passes the Luhn checksum ('+mask+')'); else { add('inc','Payment card number fails the Luhn checksum — invalid or altered'); bump(16); }
+      ex('Card',mask,'High',ok?'ok':'bad'); } }
+  // IBAN (international bank account) — mod-97; longest valid prefix so trailing words aren't swallowed
+  if(/iban/i.test(t)){ const m=U.match(/[A-Z]{2}\d{2}[A-Z0-9 ]{11,42}/);
+    if(m){ const compact=m[0].replace(/\s/g,''); const L=IBAN_LEN[compact.slice(0,2)]; let ib=null;
+      if(L){ const c=compact.slice(0,L); if(compact.length>=L && ibanValid(c)) ib=c; }
+      else for(let len=Math.min(34,compact.length);len>=15;len--){ if(ibanValid(compact.slice(0,len))){ib=compact.slice(0,len);break;} }
+      if(ib){ rep.fields.iban=ib; rep.checks.push({ok:true,t:'IBAN checksum',m:'ISO 13616 mod-97',v:'Valid · '+ib}); add('obs','IBAN '+ib+' — mod-97 checksum valid'); ex('IBAN',ib,'High','ok'); }
+      else { const cand=compact.slice(0,22); rep.checks.push({ok:false,t:'IBAN checksum',m:'ISO 13616 mod-97',v:'FAILS · '+cand}); add('inc','IBAN mod-97 checksum fails — invalid account number'); bump(14); ex('IBAN',cand,'High','bad'); } } }
+  // contact fields (universal) — informational
+  const email=(t.match(/[\w.+-]+@[\w-]+\.[\w.-]{2,}/)||[])[0];
+  if(email){ rep.fields.email=email; rep.checks.push({ok:true,t:'Email',m:'RFC-style format',v:'Found · '+email}); ex('Email',email,'Low','ok'); }
+  const phRaw=(t.match(/(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b/)||[])[0];
+  const ph=phRaw?phRaw.replace(/[\s-]/g,''):'';
+  if(ph && !rep.fields.aadhaar){ rep.fields.phone=ph; rep.checks.push({ok:true,t:'Mobile number',m:'Indian format',v:'Found · '+phRaw.trim()}); }
   const dates=[...t.matchAll(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/g)]; let future=null; const today=new Date();
   dates.forEach(m=>{let dd=+m[1],mm=+m[2],yy=+m[3];if(yy<100)yy+=2000;
     if(mm>12||dd>31)return;                                   // not a valid DD/MM date, skip
@@ -682,6 +702,12 @@ function gstinCheck(g){
   return chr((36-(sum%36))%36)===g[14];
 }
 const PAN_ENTITY={P:'Individual',C:'Company',H:'HUF',F:'Firm / LLP',A:'Association of Persons',T:'Trust',B:'Body of Individuals',L:'Local authority',J:'Artificial juridical person',G:'Government'};
+// --- universal / international deterministic validators (broaden input coverage) ---
+function luhn(n){let s=0,alt=false;for(let i=n.length-1;i>=0;i--){let d=+n[i];if(alt){d*=2;if(d>9)d-=9;}s+=d;alt=!alt;}return s%10===0;}
+function ibanValid(x){x=x.replace(/\s/g,'').toUpperCase();if(!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(x))return false;
+  const r=x.slice(4)+x.slice(0,4); let rem=0;
+  for(const c of r.replace(/[A-Z]/g,ch=>ch.charCodeAt(0)-55)){rem=(rem*10+ +c)%97;} return rem===1;}
+const IBAN_LEN={AD:24,AE:23,AT:20,BE:16,BG:22,BH:22,CH:21,CY:28,CZ:24,DE:22,DK:18,EE:20,ES:24,FI:18,FR:27,GB:22,GR:27,HR:21,HU:28,IE:22,IL:23,IT:27,KW:30,LT:20,LU:20,LV:21,MT:31,NL:18,NO:15,PL:28,PT:25,QA:29,RO:24,SA:24,SE:24,SI:19,SK:24,TR:26};
 
 /* --- perceptual average-hash (near-duplicate / reused-template detection) --- */
 function aHash(cvs){
